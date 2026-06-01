@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Map of Us — 我们的地图</title>
+
+  <!-- 高德地图 JS API -->
+  <script src="https://webapi.amap.com/maps?v=2.0&key=572b9eebecae9276fa7f70850f4084a6&plugin=AMap.CustomLayer,AMap.OverLayer"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #fdf6f0;
+      color: #2d2d3f;
+      overflow-x: hidden;
+    }
+
+    /* ===== Color Palette ===== */
+    :root {
+      --rose: #e8747c;
+      --rose-light: #f5d6da;
+      --rose-dark: #c75b63;
+      --warm: #fdf0e8;
+      --warm-dark: #f5e0d0;
+      --purple: #7c6fa0;
+      --purple-light: #e8e0f0;
+      --gold: #e8c46a;
+      --gold-light: #faf0d8;
+      --dark: #2d2d3f;
+      --gray: #8a8a9a;
+      --gray-light: #c8c8d0;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+      --radius: 16px;
+    }
+
+    /* ===== Typography ===== */
+    .section-title {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 32px;
+    }
+    .section-title .heart { color: var(--rose); }
+    .section-title .sub {
+      display: block;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--gray);
+      letter-spacing: 4px;
+      margin-top: 6px;
+    }
+
+    /* ===== Header / Hero ===== */
+    header {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background: linear-gradient(135deg, #fdf0e8 0%, #f8e0df 50%, #f0e4f0 100%);
+      overflow: hidden;
+      padding: 40px 20px;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 40%, rgba(232, 116, 124, 0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 60%, rgba(124, 111, 160, 0.06) 0%, transparent 50%);
+      animation: floatBg 20s ease-in-out infinite;
+    }
+    @keyframes floatBg {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(30px, -20px) rotate(1deg); }
+      66% { transform: translate(-20px, 30px) rotate(-1deg); }
+    }
+    header > * { position: relative; z-index: 1; }
+
+    .hero-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    header h1 {
+      font-size: clamp(40px, 8vw, 72px);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--rose) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 4px;
+      margin-bottom: 12px;
+    }
+    header .tagline {
+      font-size: clamp(16px, 3vw, 22px);
+      color: var(--gray);
+      letter-spacing: 6px;
+      font-weight: 300;
+      margin-bottom: 40px;
+    }
+    header .couple-names {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 20px;
+      color: var(--dark);
+      font-weight: 500;
+    }
+    header .couple-names .heart-icon {
+      color: var(--rose);
+      font-size: 24px;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      animation: bounce 2s infinite;
+      color: var(--gray);
+      font-size: 14px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      z-index: 2;
+      text-decoration: none;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(10px); }
+    }
+
+    /* ===== Section Common ===== */
+    section {
+      padding: 80px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* ===== Statistics ===== */
+    #stats {
+      background: linear-gradient(135deg, var(--rose) 0%, var(--purple) 100%);
+      max-width: none;
+      padding: 60px 20px;
+      color: #fff;
+    }
+    #stats .section-title { color: #fff; }
+    #stats .section-title .sub { color: rgba(255,255,255,0.7); }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .stat-item {
+      text-align: center;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius);
+      padding: 28px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: transform 0.3s;
+    }
+    .stat-item:hover { transform: translateY(-4px); }
+    .stat-number {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.85;
+      letter-spacing: 2px;
+    }
+
+    /* ===== Map Container ===== */
+    #map-section {
+      background: #fff;
+      max-width: none;
+      padding: 0;
+    }
+    #map-section .section-title {
+      padding: 60px 20px 10px;
+      margin-bottom: 10px;
+    }
+    #map-container {
+      width: 100%;
+      height: 600px;
+      position: relative;
+    }
+    @media (max-width: 768px) {
+      #map-container { height: 450px; }
+    }
+
+    /* 自定义地图弹窗样式 */
+    .custom-info-window {
+      padding: 16px;
+      max-width: 280px;
+    }
+    .custom-info-window h3 {
+      font-size: 18px;
+      color: var(--rose);
+      margin-bottom: 6px;
+    }
+    .custom-info-window .time {
+      font-size: 12px;
+      color: var(--gray);
+      margin-bottom: 8px;
+    }
+    .custom-info-window .desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--dark);
+    }
+    .custom-info-window .photos-preview {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .custom-info-window .photos-preview img {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .custom-info-window .photos-preview img:hover {
+      transform: scale(1.1);
+    }
+
+    /* ===== Timeline ===== */
+    #timeline {
+      background: var(--warm);
+      max-width: none;
+      padding: 80px 20px;
+    }
+    #timeline .section-title .sub { color: rgba(0,0,0,0.4); }
+    .timeline-container {
+      max-width: 700px;
+      margin: 0 auto;
+      position: relative;
+      padding-left: 40px;
+    }
+    .timeline-container::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--rose-light), var(--purple-light));
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 36px;
+      animation: fadeInUp 0.6s ease backwards;
+    }
+    .timeline-item:nth-child(1) { animation-delay: 0.1s; }
+    .timeline-item:nth-child(2) { animation-delay: 0.2s; }
+    .timeline-item:nth-child(3) { animation-delay: 0.3s; }
+    .timeline-item:nth-child(4) { animation-delay: 0.4s; }
+    .timeline-item:nth-child(5) { animation-delay: 0.5s; }
+    .timeline-item:nth-child(6) { animation-delay: 0.6s; }
+    .timeline-item:nth-child(7) { animation-delay: 0.7s; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -32px;
+      top: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--rose);
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 2px var(--rose-light);
+    }
+    .timeline-card {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border-left: 4px solid var(--rose);
+    }
+    .timeline-card:hover {
+      transform: translateX(4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+    }
+    .timeline-card .month {
+      font-size: 12px;
+      color: var(--rose);
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .timeline-card h3 {
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .timeline-card .brief {
+      font-size: 14px;
+      color: var(--gray);
+      line-height: 1.6;
+    }
+
+    /* ===== Modal ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.3s;
+    }
+    .modal-overlay.active { display: flex; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: var(--radius);
+      max-width: 520px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 32px;
+      position: relative;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: var(--warm);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray);
+      transition: all 0.2s;
+    }
+    .modal-close:hover {
+      background: var(--rose-light);
+      color: var(--rose);
+    }
+    .modal-content .modal-month {
+      font-size: 12px;
+      color: var(--rose);
+      font-weight: 600;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+    }
+    .modal-content h2 {
+      font-size: 24px;
+      margin-bottom: 16px;
+      color: var(--dark);
+    }
+    .modal-content .modal-desc {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #555;
+      margin-bottom: 20px;
+    }
+    .modal-content .modal-photos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .modal-content .modal-photos .photo-placeholder {
+      aspect-ratio: 1;
+      background: var(--warm);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray-light);
+      font-size: 13px;
+      border: 2px dashed var(--gray-light);
+    }
+    .modal-content .modal-coords {
+      font-size: 12px;
+      color: var(--gray-light);
+      margin-top: 12px;
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      background: var(--dark);
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+    footer .big {
+      font-size: 20px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    footer .big .rose { color: var(--rose); }
+
+    /* ===== Loading ===== */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      color: var(--gray);
+    }
+    .loading::after {
+      content: '';
+      width: 24px;
+      height: 24px;
+      margin-left: 10px;
+      border: 3px solid var(--gray-light);
+      border-top-color: var(--rose);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 480px) {
+      section { padding: 50px 16px; }
+      .section-title { font-size: 22px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .stat-item { padding: 20px 12px; }
+      .stat-number { font-size: 32px; }
+      .timeline-container { padding-left: 32px; }
+      .timeline-dot { left: -25px; width: 12px; height: 12px; }
+      .modal-content { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER / HERO ===== -->
+  <header>
+    <div class="hero-icon">🗺️</div>
+    <h1>Map of Us</h1>
+    <p class="tagline">我们的地图 · 一起走过的路</p>
+    <div class="couple-names">
+      <span>🐻 彭钰东</span>
+      <span class="heart-icon">❤️</span>
+      <span>🐰 陈语宣</span>
+    </div>
+    <a href="#stats" class="scroll-hint">往下滑动 ↓</a>
+  </header>
+
+  <!-- ===== STATISTICS ===== -->
+  <section id="stats">
+    <h2 class="section-title">
+      我们的足迹
+      <span class="sub">Every step together</span>
+    </h2>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-item">
+        <div class="stat-number" id="provinceCount">0</div>
+        <div class="stat-label">省份 · Provinces</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number" id="cityCount">0</div>
+        <div class="stat-label">城市 · Cities</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number" id="tripCount">0</div>
+        <div class="stat-label">旅程 · Trips</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number" id="monthSpan">0</div>
+        <div class="stat-label">月份 · Months</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MAP ===== -->
+  <section id="map-section">
+    <h2 class="section-title">
+      🗺️ 点亮的地图
+      <span class="sub">每一站都是一个故事</span>
+    </h2>
+    <div id="map-container">
+      <div class="loading">地图加载中...</div>
+    </div>
+  </section>
+
+  <!-- ===== TIMELINE ===== -->
+  <section id="timeline">
+    <h2 class="section-title">
+      📅 回忆时间线
+      <span class="sub">从初识到现在，每一刻都珍贵</span>
+    </h2>
+    <div class="timeline-container" id="timelineContainer">
+      <div class="loading">加载中...</div>
+    </div>
+  </section>
+
+  <!-- ===== MODAL ===== -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div class="modal-month" id="modalMonth"></div>
+      <h2 id="modalTitle"></h2>
+      <div class="modal-desc" id="modalDesc"></div>
+      <div class="modal-photos" id="modalPhotos"></div>
+      <div class="modal-coords" id="modalCoords"></div>
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <div class="big">Map of <span class="rose">Us</span></div>
+    <p>我们的故事，还在继续...</p>
+    <p style="margin-top:8px; font-size:12px;">Made with ❤️ · #vibecoding大赏 #ai新星计划</p>
+  </footer>
+
+  <script>
+    /* ===== Supabase Config ===== */
+    const SUPABASE_URL = 'https://rljdpevblyopnuqimvqx.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_CJ-IjaXKEaGxDBAYPoQpFQ_3hT3nV9d';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ===== 高德安全密钥 ===== */
+    window._AMapSecurityConfig = {
+      securityJsCode: '3a4cd2ea8ba3be7efec44b7e413ec737',
+    };
+
+    /* ===== State ===== */
+    let memories = [];
+    let map = null;
+    let markers = [];
+
+    /* ===== Utils ===== */
+    function getMonthLabel(monthStr) {
+      const [y, m] = monthStr.split('-');
+      const months = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+      return `${y}年 ${months[parseInt(m)-1]}`;
+    }
+
+    function formatMonthShort(monthStr) {
+      const [y, m] = monthStr.split('-');
+      return `${y}.${m}`;
+    }
+
+    /* ===== Animate number ===== */
+    function animateNumber(el, target, duration = 1000) {
+      const start = parseInt(el.textContent) || 0;
+      const startTime = performance.now();
+      function tick(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(start + (target - start) * eased);
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    /* ===== Fetch Data ===== */
+    async function fetchMemories() {
+      try {
+        const { data, error } = await supabase
+          .from('couple_memories')
+          .select('*')
+          .order('event_month', { ascending: true });
+
+        if (error) throw error;
+        memories = data || [];
+        return memories;
+      } catch (err) {
+        console.error('获取数据失败:', err);
+        document.querySelector('#map-container .loading').textContent = '⚠️ 加载失败，请检查 Supabase 配置';
+        document.querySelector('#timelineContainer .loading').textContent = '⚠️ 加载失败';
+        return [];
+      }
+    }
+
+    /* ===== Render Statistics ===== */
+    function renderStats(data) {
+      // 省份统计（根据经纬度所在省份粗略估算）
+      // 简化：手动映射已知地点
+      const provinceMap = {
+        '天津初识地': '天津市',
+        '北京科技大学天津学院': '天津市',
+        '青岛': '山东省',
+        '秦皇岛': '河北省',
+        '川西甘孜草原': '四川省',
+        '成都武侯区四姑娘山附近': '四川省',
+        '西安': '陕西省',
+      };
+      const provinces = new Set(data.map(d => provinceMap[d.location_name] || '其他'));
+      const provinceCount = provinces.size;
+      const cityCount = data.length;
+
+      // 计算月份跨度
+      const months = data.map(d => d.event_month).sort();
+      if (months.length >= 2) {
+        const [y1, m1] = months[0].split('-').map(Number);
+        const [y2, m2] = months[months.length - 1].split('-').map(Number);
+        const monthSpan = (y2 - y1) * 12 + (m2 - m1) + 1;
+        animateNumber(document.getElementById('monthSpan'), monthSpan);
+      } else if (months.length === 1) {
+        document.getElementById('monthSpan').textContent = '1';
+      }
+
+      animateNumber(document.getElementById('provinceCount'), provinceCount);
+      animateNumber(document.getElementById('cityCount'), cityCount);
+      animateNumber(document.getElementById('tripCount'), cityCount);
+    }
+
+    /* ===== Init Map ===== */
+    function initMap(data) {
+      const container = document.getElementById('map-container');
+      container.innerHTML = '';
+
+      map = new AMap.Map('map-container', {
+        zoom: 5,
+        center: [104.0, 35.0],
+        layers: [
+          new AMap.TileLayer.Satellite()
+        ],
+        mapStyle: 'amap://styles/light',
+        viewMode: '2D',
+        resizeEnable: true,
+      });
+
+      // 交通图层
+      const traffic = new AMap.TileLayer.Traffic({
+        zIndex: 10,
+      });
+      map.add(traffic);
+
+      const validData = data.filter(d => d.lat != null && d.lng != null);
+
+      if (validData.length === 0) {
+        map.setCenter([104.0, 35.0]);
+        map.setZoom(5);
+        return;
+      }
+
+      // 创建自定义标记
+      validData.forEach((d, index) => {
+        const markerContent = document.createElement('div');
+        markerContent.style.cssText = `
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #e8747c, #7c6fa0);
+          border: 3px solid #fff;
+          box-shadow: 0 4px 16px rgba(232,116,124,0.4);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.2s;
+          font-size: 14px;
+          color: #fff;
+          font-weight: bold;
+          animation: markerBounce 0.5s ease backwards;
+          animation-delay: ${index * 0.1}s;
+        `;
+        markerContent.textContent = '❤';
+        markerContent.title = d.location_name;
+
+        // 添加 pulse 动画
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes markerBounce {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+
+        const marker = new AMap.Marker({
+          position: [d.lng, d.lat],
+          content: markerContent,
+          offset: new AMap.Pixel(-18, -18),
+          zIndex: 100,
+        });
+
+        marker.on('click', () => {
+          openModal(d);
+        });
+
+        // 信息窗体
+        const info = new AMap.InfoWindow({
+          content: `
+            <div class="custom-info-window">
+              <h3>${d.location_name}</h3>
+              <div class="time">${getMonthLabel(d.event_month)}</div>
+              <div class="desc">${d.description || '还没有记录描述~'}</div>
+            </div>
+          `,
+          offset: new AMap.Pixel(0, -30),
+          closeWhenClickMap: true,
+        });
+
+        marker.on('mouseover', () => {
+          info.open(map, marker.getPosition());
+        });
+        marker.on('mouseout', () => {
+          setTimeout(() => info.close(), 2000);
+        });
+
+        markers.push(marker);
+        map.add(marker);
+      });
+
+      // 自动适配视野
+      if (validData.length > 0) {
+        const positions = validData.map(d => [d.lng, d.lat]);
+        map.setFitView(null, false, [60, 60, 60, 60]);
+      }
+
+      // 连线
+      if (validData.length >= 2) {
+        const path = validData.map(d => [d.lng, d.lat]);
+        const polyline = new AMap.Polyline({
+          path: path,
+          borderWeight: 2,
+          strokeColor: 'rgba(232,116,124,0.5)',
+          strokeWeight: 3,
+          strokeStyle: 'dashed',
+          strokeDasharray: [10, 10],
+          lineJoin: 'round',
+        });
+        map.add(polyline);
+      }
+
+      // 手动延迟resize确保渲染
+      setTimeout(() => map.resize(), 500);
+    }
+
+    /* ===== Render Timeline ===== */
+    function renderTimeline(data) {
+      const container = document.getElementById('timelineContainer');
+      container.innerHTML = '';
+
+      data.forEach(d => {
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+        item.innerHTML = `
+          <div class="timeline-dot"></div>
+          <div class="timeline-card" data-id="${d.id}">
+            <div class="month">${formatMonthShort(d.event_month)}</div>
+            <h3>${d.location_name}</h3>
+            <div class="brief">${d.description ? d.description.substring(0, 60) + (d.description.length > 60 ? '...' : '') : '点击查看详情'}</div>
+          </div>
+        `;
+        item.querySelector('.timeline-card').addEventListener('click', () => openModal(d));
+        container.appendChild(item);
+      });
+
+      if (data.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:var(--gray);padding:40px;">还没有回忆记录，一起去创造吧 🚀</div>';
+      }
+    }
+
+    /* ===== Modal ===== */
+    function openModal(data) {
+      document.getElementById('modalMonth').textContent = getMonthLabel(data.event_month);
+      document.getElementById('modalTitle').textContent = data.location_name;
+      document.getElementById('modalDesc').textContent = data.description || '还没有记录描述~';
+
+      const photosContainer = document.getElementById('modalPhotos');
+      photosContainer.innerHTML = '';
+
+      if (data.photos && data.photos.length > 0) {
+        data.photos.forEach(url => {
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = '回忆照片';
+          img.style.cssText = 'width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;';
+          photosContainer.appendChild(img);
+        });
+      } else {
+        // 显示占位
+        for (let i = 0; i < 3; i++) {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'photo-placeholder';
+          placeholder.textContent = '📷';
+          photosContainer.appendChild(placeholder);
+        }
+        const hint = document.createElement('p');
+        hint.style.cssText = 'grid-column:1/-1;font-size:13px;color:var(--gray);text-align:center;margin-top:4px;';
+        hint.textContent = '照片还没上传，期待你的回忆 📸';
+        photosContainer.appendChild(hint);
+      }
+
+      const coordsEl = document.getElementById('modalCoords');
+      if (data.lat && data.lng) {
+        coordsEl.textContent = `📍 ${data.lat.toFixed(4)}, ${data.lng.toFixed(4)}`;
+      } else {
+        coordsEl.textContent = '📍 坐标待补充';
+      }
+
+      document.getElementById('modalOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Modal events
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modalOverlay').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    /* ===== Intersection Observer for timeline ===== */
+    function observeTimeline() {
+      const items = document.querySelectorAll('.timeline-item');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.style.animationPlayState = 'running';
+          }
+        });
+      }, { threshold: 0.1 });
+
+      items.forEach(item => {
+        item.style.animationPlayState = 'paused';
+        observer.observe(item);
+      });
+    }
+
+    /* ===== Main ===== */
+    async function main() {
+      const data = await fetchMemories();
+
+      // 防止高德地图在 Resize 时出问题，先渲染 stats 和 timeline
+      renderStats(data);
+      renderTimeline(data);
+
+      // 等 DOM 完全加载后再初始化地图
+      setTimeout(() => initMap(data), 300);
+
+      // 使用 ResizeObserver 保持地图尺寸正确
+      const mapContainer = document.getElementById('map-container');
+      const resizeObserver = new ResizeObserver(() => {
+        if (map) map.resize();
+      });
+      resizeObserver.observe(mapContainer);
+    }
+
+    // 页面完全加载后启动
+    window.addEventListener('load', main);
+  </script>
+
+</body>
+</html>
